@@ -454,18 +454,9 @@ const jobs = [];
 	const jobsContainer = document.getElementById('jobsContainer') as HTMLElement;
 
 	async function loadJobs() {
-		try {
-			const response = await fetch(`${API_BASE}/jobs?include_applied=true`);
-			if (response.ok) {
-				const jobs = await response.json();
-				updateMetrics(jobs);
-				renderJobs(jobs);
-			} else {
-				console.error('Load failed:', response.status);
-			}
-		} catch (err) {
-			console.error('Error loading jobs:', err);
-		}
+		const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+		updateMetrics(jobs);
+		renderJobs(jobs);
 	}
 
 	function updateMetrics(jobs: any[]) {
@@ -520,6 +511,12 @@ const jobs = [];
 						button.dataset.applied = newState.toString();
 						button.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
 						card.classList.toggle('applied', newState);
+						
+						// Update localStorage
+						const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+						const job = jobs.find((j: any) => j.id === id);
+						if (job) job.aplicado = newState;
+						localStorage.setItem('jobs', JSON.stringify(jobs));
 					} else {
 						console.error('Failed to update status:', response.status, response.statusText);
 						button.textContent = originalText;
@@ -575,21 +572,12 @@ const jobs = [];
 	}
 
 	async function filterJobs() {
-		try {
-			const hide = (hideApplied as HTMLInputElement)?.checked || false;
-			const minScore = parseInt((scoreRange as HTMLInputElement)?.value || '0');
-			
-			const response = await fetch(`${API_BASE}/jobs?include_applied=${!hide}&min_score=${minScore}`);
-			if (response.ok) {
-				const jobs = await response.json();
-				updateMetrics(jobs);
-				renderJobs(jobs);
-			} else {
-				console.error('Filter failed:', response.status);
-			}
-		} catch (err) {
-			console.error('Error filtering jobs:', err);
-		}
+		const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+		const hide = (hideApplied as HTMLInputElement)?.checked || false;
+		const minScore = parseInt((scoreRange as HTMLInputElement)?.value || '0');
+		const filtered = jobs.filter((j: any) => (hide ? !j.aplicado : true) && j.matching_score >= minScore);
+		updateMetrics(filtered);
+		renderJobs(filtered);
 	}
 
 	if (scoreRange && scoreVal) {
@@ -615,7 +603,10 @@ const jobs = [];
 		try {
 			const response = await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
 			if (response.ok) {
-				location.reload();
+				const data = await response.json();
+				localStorage.setItem('jobs', JSON.stringify(data.jobs));
+				updateMetrics(data.jobs);
+				renderJobs(data.jobs);
 			} else {
 				console.error('Scrape failed:', response.status);
 				scrapeBtn.textContent = originalText;
@@ -636,13 +627,17 @@ const jobs = [];
 		matchingBtn.textContent = 'Procesando...';
 		
 		try {
+			const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
 			const response = await fetch(`${API_BASE}/matching`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cv_text: (cvText as HTMLTextAreaElement).value || '' })
+				body: JSON.stringify({ cv_text: (cvText as HTMLTextAreaElement).value || '', jobs: jobs })
 			});
 			if (response.ok) {
-				location.reload();
+				const data = await response.json();
+				localStorage.setItem('jobs', JSON.stringify(data.jobs));
+				updateMetrics(data.jobs);
+				renderJobs(data.jobs);
 			} else {
 				console.error('Matching failed:', response.status);
 				matchingBtn.textContent = originalText;
