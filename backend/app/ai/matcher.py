@@ -5,7 +5,18 @@ import string
 
 class CVMatcher:
     def __init__(self):
-        self.vectorizer = TfidfVectorizer(stop_words='spanish')
+        # Sklearn no soporta 'spanish' como string directo, usamos una lista básica
+        spanish_stop_words = [
+            'de', 'la', 'que', 'el', 'en', 'y', 'a', 'los', 'del', 'se', 'las', 'por', 'un', 'para', 'con', 
+            'no', 'una', 'su', 'al', 'lo', 'como', 'más', 'pero', 'sus', 'le', 'ya', 'o', 'este', 'sí', 
+            'porque', 'esta', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'también', 'me', 'hasta', 'hay', 
+            'donde', 'quien', 'desde', 'todo', 'nos', 'durante', 'todos', 'uno', 'les', 'ni', 'contra', 
+            'otros', 'ese', 'eso', 'ante', 'ellos', 'e', 'esto', 'mí', 'antes', 'algunos', 'qué', 'unos', 
+            'yo', 'otro', 'otras', 'otra', 'él', 'tanto', 'esa', 'estos', 'mucho', 'quienes', 'nada', 
+            'muchos', 'cual', 'poco', 'ella', 'estar', 'estas', 'algunas', 'algo', 'nosotros', 'mi', 
+            'mis', 'tú', 'te', 'ti', 'tu', 'tus'
+        ]
+        self.vectorizer = TfidfVectorizer(stop_words=spanish_stop_words)
 
     def _clean_text(self, text):
         """
