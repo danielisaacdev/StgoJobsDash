@@ -1,0 +1,391 @@
+---
+import Layout from '../layouts/Layout.astro';
+import JobCard from '../components/JobCard.astro';
+
+// SSR: Fetch initial jobs from FastAPI
+let jobs = [];
+try {
+	const response = await fetch('http://localhost:8000/jobs?include_applied=true');
+	if (response.ok) {
+		jobs = await response.json();
+	}
+} catch (error) {
+	console.error("Backend Error:", error);
+}
+
+const totalJobs = jobs.length;
+const appliedCount = jobs.filter(j => j.aplicado).length;
+const remotePercent = totalJobs > 0 
+	? Math.round((jobs.filter(j => j.modalidad === 'Remoto').length / totalJobs) * 100) 
+	: 0;
+---
+
+<Layout title="StgoJobsDash | Dashboard Premium">
+	<header class="dashboard-header animate-fade-in">
+		<div class="header-content">
+			<h1>StgoJobsDash <span class="badge">V3</span></h1>
+			<p>Ecosistema de búsqueda optimizado para <span>chiletrabajos.cl</span></p>
+		</div>
+		<div class="metrics-row">
+			<div class="metric">
+				<span class="label">Vacantes</span>
+				<span class="value">{totalJobs}</span>
+			</div>
+			<div class="metric alt">
+				<span class="label">Postulados</span>
+				<span class="value">{appliedCount}</span>
+			</div>
+			<div class="metric accent">
+				<span class="label">Remoto %</span>
+				<span class="value">{remotePercent}%</span>
+			</div>
+		</div>
+	</header>
+
+	<div class="dashboard-grid">
+		<aside class="sidebar animate-fade-in">
+			<div class="sidebar-section">
+				<h3>Scraper Control</h3>
+				<div class="input-group">
+					<input type="text" id="queryInput" placeholder="Ej: Python Developer" />
+					<button id="scrapeBtn" class="btn btn-accent">Scrapear</button>
+				</div>
+				<p class="hint">Extrae 3 páginas de Chiletrabajos.cl</p>
+			</div>
+
+			<div class="sidebar-section">
+				<h3>Filtros Avanzados</h3>
+				<label class="checkbox-container">
+					Ocultar Postulados
+					<input type="checkbox" id="hideApplied" />
+					<span class="checkmark"></span>
+				</label>
+				
+				<label class="range-container">
+					Matching Score Mínimo
+					<input type="range" id="scoreRange" min="0" max="100" value="0" />
+					<span id="scoreVal">0%</span>
+				</label>
+			</div>
+
+			<div class="sidebar-section">
+				<h3>CV para Matching</h3>
+				<textarea id="cvText" placeholder="Pega tu CV (texto) aquí para calcular el match score..."></textarea>
+				<button id="matchingBtn" class="btn btn-secondary">Actualizar Scores</button>
+			</div>
+		</aside>
+
+		<main class="jobs-list">
+			<div class="list-header">
+				<h2>Ofertas Recientes</h2>
+				<span id="resultsCount">{totalJobs} resultados</span>
+			</div>
+			<div id="jobsContainer" class="jobs-grid">
+				{jobs.map((job) => (
+					<JobCard 
+						id={job.id}
+						title={job.titulo}
+						company={job.empresa}
+						link={job.link}
+						date={job.fecha_publicacion}
+						modality={job.modalidad}
+						salary={job.sueldo_estimado}
+						score={job.matching_score}
+						applied={job.aplicado === 1}
+						description={job.descripcion}
+					/>
+				))}
+			</div>
+		</main>
+	</div>
+</Layout>
+
+<style>
+	.dashboard-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 2.5rem;
+		padding-bottom: 1.5rem;
+		border-bottom: 1px solid var(--border-color);
+	}
+
+	.dashboard-header h1 {
+		font-size: 2.5rem;
+		font-weight: 800;
+		background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+		letter-spacing: -1px;
+	}
+
+	.badge {
+		font-size: 0.9rem;
+		padding: 0.2rem 0.5rem;
+		background: var(--accent-secondary);
+		-webkit-text-fill-color: white;
+		border-radius: 6px;
+		vertical-align: middle;
+	}
+
+	.header-content p {
+		color: var(--text-secondary);
+		margin-top: 0.5rem;
+	}
+
+	.header-content p span {
+		color: var(--text-primary);
+		font-weight: 600;
+	}
+
+	.metrics-row {
+		display: flex;
+		gap: 1.5rem;
+	}
+
+	.metric {
+		background: var(--bg-secondary);
+		padding: 1rem 1.75rem;
+		border-radius: 12px;
+		display: flex;
+		flex-direction: column;
+		min-width: 140px;
+		border: 1px solid var(--border-color);
+	}
+
+	.metric.accent { border-color: var(--accent-primary); }
+	.metric.alt { border-color: var(--accent-secondary); }
+
+	.metric .label {
+		color: var(--text-secondary);
+		font-size: 0.85rem;
+		text-transform: uppercase;
+		letter-spacing: 1px;
+	}
+
+	.metric .value {
+		font-size: 1.75rem;
+		font-weight: 700;
+		margin-top: 0.25rem;
+	}
+
+	.dashboard-grid {
+		display: grid;
+		grid-template-columns: 320px 1fr;
+		gap: 2.5rem;
+	}
+
+	.sidebar {
+		display: flex;
+		flex-direction: column;
+		gap: 2rem;
+	}
+
+	.sidebar-section {
+		background: var(--bg-secondary);
+		padding: 1.5rem;
+		border-radius: 16px;
+		border: 1px solid var(--border-color);
+	}
+
+	.sidebar-section h3 {
+		font-size: 1rem;
+		margin-bottom: 1rem;
+		color: var(--text-primary);
+	}
+
+	.input-group {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	input[type="text"], textarea {
+		background: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 10px;
+		color: white;
+		padding: 0.75rem;
+		width: 100%;
+		font-family: 'Inter', sans-serif;
+	}
+
+	textarea {
+		height: 120px;
+		resize: none;
+		margin-bottom: 0.75rem;
+		font-size: 0.85rem;
+	}
+
+	.btn {
+		cursor: pointer;
+		font-weight: 600;
+		transition: var(--transition-smooth);
+		border: none;
+	}
+
+	.btn-accent {
+		background: var(--accent-secondary);
+		color: white;
+		padding: 0 1rem;
+		border-radius: 10px;
+	}
+
+	.btn-secondary {
+		background: var(--bg-primary);
+		color: var(--accent-primary);
+		border: 1px solid var(--accent-primary);
+		padding: 0.75rem;
+		width: 100%;
+		border-radius: 10px;
+	}
+
+	.hint {
+		font-size: 0.75rem;
+		color: var(--text-secondary);
+	}
+
+	.checkbox-container {
+		display: block;
+		position: relative;
+		padding-left: 35px;
+		margin-bottom: 1rem;
+		cursor: pointer;
+		font-size: 0.9rem;
+		user-select: none;
+	}
+
+	.checkbox-container input { visibility: hidden; position: absolute; }
+
+	.checkmark {
+		position: absolute;
+		top: 0;
+		left: 0;
+		height: 20px;
+		width: 20px;
+		background-color: var(--bg-primary);
+		border: 1px solid var(--border-color);
+		border-radius: 5px;
+	}
+
+	.checkbox-container input:checked ~ .checkmark {
+		background-color: var(--accent-secondary);
+		border-color: var(--accent-secondary);
+	}
+
+	.checkmark:after {
+		content: "";
+		position: absolute;
+		display: none;
+		left: 6px;
+		top: 2px;
+		width: 5px;
+		height: 10px;
+		border: solid white;
+		border-width: 0 2px 2px 0;
+		transform: rotate(45deg);
+	}
+
+	.checkbox-container input:checked ~ .checkmark:after { display: block; }
+
+	.range-container {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		font-size: 0.9rem;
+	}
+
+	.jobs-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+	}
+
+	.list-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.list-header h2 { font-size: 1.5rem; font-weight: 700; }
+	#resultsCount { color: var(--text-secondary); font-size: 0.9rem; }
+
+	.jobs-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+		gap: 1.5rem;
+	}
+</style>
+
+<script>
+	// Interactivity and dynamic fetching
+	const scrapeBtn = document.getElementById('scrapeBtn');
+	const queryInput = document.getElementById('queryInput');
+	const matchingBtn = document.getElementById('matchingBtn');
+	const cvText = document.getElementById('cvText');
+	const hideApplied = document.getElementById('hideApplied');
+	const scoreRange = document.getElementById('scoreRange');
+	const scoreVal = document.getElementById('scoreVal');
+	const jobsContainer = document.getElementById('jobsContainer');
+
+	scoreRange.addEventListener('input', (e) => {
+		scoreVal.textContent = `${e.target.value}%`;
+		filterJobs();
+	});
+
+	hideApplied.addEventListener('change', filterJobs);
+
+	async function filterJobs() {
+		const hide = hideApplied.checked;
+		const minScore = parseInt(scoreRange.value);
+		
+		const response = await fetch(`http://localhost:8000/jobs?include_applied=${!hide}&min_score=${minScore}`);
+		if (response.ok) {
+			const jobs = await response.json();
+			renderJobs(jobs);
+		}
+	}
+
+	function renderJobs(jobs) {
+		// Por simplicidad en este MVP, recargamos la página o inyectamos HTML
+		// Idealmente usaríamos React/Vue en el Island o un framework SPA
+		// Pero como es Astro Vanilla, podemos simplemente recargar si es local
+		// O manipular el DOM agresivamente:
+		location.reload(); // Hard refresh para simplificar sincronía con SSR en este paso
+	}
+
+	scrapeBtn.addEventListener('click', async () => {
+		scrapeBtn.disabled = true;
+		scrapeBtn.textContent = 'Buscando...';
+		const query = queryInput.value || 'Python';
+		
+		try {
+			await fetch(`http://localhost:8000/scrape?query=${encodeURIComponent(query)}`);
+			location.reload();
+		} catch (err) {
+			console.error(err);
+		} finally {
+			scrapeBtn.disabled = false;
+			scrapeBtn.textContent = 'Scrapear';
+		}
+	});
+
+	matchingBtn.addEventListener('click', async () => {
+		matchingBtn.disabled = true;
+		matchingBtn.textContent = 'Procesando...';
+		
+		try {
+			await fetch('http://localhost:8000/matching', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ cv_text: cvText.value })
+			});
+			location.reload();
+		} catch (err) {
+			console.error(err);
+		} finally {
+			matchingBtn.disabled = false;
+			matchingBtn.textContent = 'Actualizar Scores';
+		}
+	});
+</script>

@@ -1,0 +1,76 @@
+---
+interface Props {
+	title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="StgoJobsDash - Dashboard de empleos premium" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com">
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+		<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+	</head>
+	<body>
+		<div class="app-container">
+			<slot />
+		</div>
+	</body>
+</html>
+<style is:global>
+	:root {
+		--bg-primary: #0a0b10;
+		--bg-secondary: #141721;
+		--accent-primary: #00f28d; /* Emerald Green */
+		--accent-secondary: #0070f3; /* Electric Blue */
+		--text-primary: #ffffff;
+		--text-secondary: #a0aec0;
+		--border-color: #2d3748;
+		--card-bg: #1a202c;
+		--transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	* {
+		box-sizing: border-box;
+		margin: 0;
+		padding: 0;
+	}
+
+	html {
+		font-family: 'Inter', system-ui, sans-serif;
+		background: var(--bg-primary);
+		color: var(--text-primary);
+	}
+
+	body {
+		min-height: 100vh;
+	}
+
+	h1, h2, h3 {
+		font-family: 'Outfit', sans-serif;
+	}
+
+	.app-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 2rem;
+	}
+
+	/* Micro-animations */
+	@keyframes fadeIn {
+		from { opacity: 0; transform: translateY(10px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	.animate-fade-in {
+		animation: fadeIn 0.5s ease forwards;
+	}
+</style>
