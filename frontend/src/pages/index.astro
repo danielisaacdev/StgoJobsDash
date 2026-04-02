@@ -3,9 +3,14 @@ import Layout from '../layouts/Layout.astro';
 import JobCard from '../components/JobCard.astro';
 
 // SSR: Fetch initial jobs from FastAPI
+// En Vercel Multi-service, el backend se mapea a /_/backend
+const API_URL = import.meta.env.PROD 
+	? 'https://stgo-jobs-dash.vercel.app/_/backend' // URL base de producción (se recomienda usar variable de entorno)
+	: 'http://localhost:8000';
+
 let jobs = [];
 try {
-	const response = await fetch('http://localhost:8000/jobs?include_applied=true');
+	const response = await fetch(`${API_URL}/jobs?include_applied=true`);
 	if (response.ok) {
 		jobs = await response.json();
 	}
@@ -319,6 +324,12 @@ const remotePercent = totalJobs > 0
 
 <script>
 	// Interactivity and dynamic fetching
+	// En Vercel (Prod), el backend está en /_/backend relative path
+	// En Local, usar http://localhost:8000
+	const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+		? 'http://localhost:8000'
+		: '/_/backend';
+
 	const scrapeBtn = document.getElementById('scrapeBtn');
 	const queryInput = document.getElementById('queryInput');
 	const matchingBtn = document.getElementById('matchingBtn');
@@ -339,7 +350,7 @@ const remotePercent = totalJobs > 0
 		const hide = hideApplied.checked;
 		const minScore = parseInt(scoreRange.value);
 		
-		const response = await fetch(`http://localhost:8000/jobs?include_applied=${!hide}&min_score=${minScore}`);
+		const response = await fetch(`${API_BASE}/jobs?include_applied=${!hide}&min_score=${minScore}`);
 		if (response.ok) {
 			const jobs = await response.json();
 			renderJobs(jobs);
@@ -360,7 +371,7 @@ const remotePercent = totalJobs > 0
 		const query = queryInput.value || 'Python';
 		
 		try {
-			await fetch(`http://localhost:8000/scrape?query=${encodeURIComponent(query)}`);
+			await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
 			location.reload();
 		} catch (err) {
 			console.error(err);
@@ -375,7 +386,7 @@ const remotePercent = totalJobs > 0
 		matchingBtn.textContent = 'Procesando...';
 		
 		try {
-			await fetch('http://localhost:8000/matching', {
+			await fetch(`${API_BASE}/matching`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ cv_text: cvText.value })
