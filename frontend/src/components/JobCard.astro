@@ -189,6 +189,10 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 
 <script>
 	// Client-side logic for the "Apply" button
+	const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+		? 'http://localhost:8000'
+		: '/api';
+
 	document.querySelectorAll('.apply-btn').forEach(btn => {
 		btn.addEventListener('click', async (e) => {
 			const card = btn.closest('.job-card');
@@ -196,7 +200,7 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 			const isApplied = btn.dataset.applied === 'true';
 			
 			try {
-				const response = await fetch(`http://localhost:8000/jobs/${id}/apply`, {
+				const response = await fetch(`${API_BASE}/jobs/${id}/apply`, {
 					method: 'PATCH',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ aplicado: !isApplied })

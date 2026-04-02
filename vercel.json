@@ -1,13 +1,23 @@
 {
-    "experimentalServices": {
-        "frontend": {
-            "entrypoint": "frontend",
-            "routePrefix": "/",
-            "framework": "astro"
-        },
-        "backend": {
-            "entrypoint": "backend",
-            "routePrefix": "/_/backend"
-        }
+  "framework": null,
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@astrojs/vercel"
+    },
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python"
     }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/backend/main.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ]
 }

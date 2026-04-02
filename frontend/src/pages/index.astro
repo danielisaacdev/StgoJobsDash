@@ -3,9 +3,9 @@ import Layout from '../layouts/Layout.astro';
 import JobCard from '../components/JobCard.astro';
 
 // SSR: Fetch initial jobs from FastAPI
-// En Vercel Multi-service, el backend se mapea a /_/backend
+// En Vercel Multi-service, el backend se mapea a /api
 const API_URL = import.meta.env.PROD 
-	? 'https://stgo-jobs-dash.vercel.app/_/backend' // URL base de producción (se recomienda usar variable de entorno)
+	? 'https://stgo-jobs-dash.vercel.app/api' // URL base de producción (se recomienda usar variable de entorno)
 	: 'http://localhost:8000';
 
 let jobs = [];
@@ -324,11 +324,11 @@ const remotePercent = totalJobs > 0
 
 <script>
 	// Interactivity and dynamic fetching
-	// En Vercel (Prod), el backend está en /_/backend relative path
+	// En Vercel (Prod), el backend está en /api
 	// En Local, usar http://localhost:8000
 	const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 		? 'http://localhost:8000'
-		: '/_/backend';
+		: '/api';
 
 	const scrapeBtn = document.getElementById('scrapeBtn');
 	const queryInput = document.getElementById('queryInput');
