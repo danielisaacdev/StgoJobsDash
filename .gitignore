@@ -8,6 +8,11 @@ __pycache__/
 backend/empleos.db
 *.sqlite3
 
+# Vercel build outputs
+.vercel/
+frontend/.vercel/
+backend/.vercel/
+
 # Astro and build artifacts
 .astro/
 dist/
