@@ -15,12 +15,22 @@ interface Props {
 const { id, title, company, link, date, modality, salary, score, applied, description } = Astro.props;
 
 // Formatear fecha
-const formattedDate = new Date(date).toLocaleDateString('es-CL', {
-	day: '2-digit',
-	month: 'short'
-});
+let formattedDate = 'Fecha no disponible';
+try {
+	const dateObj = new Date(date);
+	if (!isNaN(dateObj.getTime())) {
+		formattedDate = dateObj.toLocaleDateString('es-CL', {
+			day: '2-digit',
+			month: 'short'
+		});
+	}
+} catch (e) {
+	console.warn('Error formatting date:', e);
+}
 
-const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--accent-secondary)' : 'var(--text-secondary)';
+const scoreColor = (score && score >= 80) ? 'var(--accent-primary)' : (score && score >= 50) ? 'var(--accent-secondary)' : 'var(--text-secondary)';
+const modalityClass = modality ? modality.toLowerCase() : '';
+const displayModality = modality || 'No especificado';
 ---
 
 <article class={`job-card ${applied ? 'applied' : ''}`} data-id={id} data-link={link}>
@@ -30,9 +40,9 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 			<p class="company">{company}</p>
 		</div>
 		{description && <p class="job-snippet">{description}</p>}
-		{score > 0 && (
+		{score && score > 0 && (
 			<div class="score-badge" style={`--score-color: ${scoreColor}`}>
-				<span>{score}% Match</span>
+				<span>{Math.round(score)}% Match</span>
 			</div>
 		)}
 	</div>
@@ -40,8 +50,8 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 	<div class="card-body">
 		<div class="tag-row">
 			<span class="tag">📅 {formattedDate}</span>
-			<span class={`tag modality ${modality.toLowerCase()}`}>{modality}</span>
-			<span class="tag salary">{salary}</span>
+			<span class={`tag modality ${modalityClass}`}>{displayModality}</span>
+			<span class="tag salary">{salary || 'No especificado'}</span>
 		</div>
 	</div>
 
@@ -199,8 +209,20 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 		
 		btn.addEventListener('click', async (e) => {
 			const card = btn.closest('.job-card');
+			if (!card) return;
+			
 			const id = card.dataset.id;
+			if (!id) {
+				console.error('No job ID found');
+				return;
+			}
+			
 			const isApplied = btn.dataset.applied === 'true';
+			
+			// Disable button during request
+			btn.disabled = true;
+			const originalText = btn.textContent;
+			btn.textContent = 'Actualizando...';
 			
 			try {
 				const response = await fetch(`${API_BASE}/jobs/${id}/apply`, {
@@ -215,10 +237,14 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 					btn.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
 					card.classList.toggle('applied', newState);
 				} else {
-					console.error('Failed to update status:', response.status);
+					console.error('Failed to update status:', response.status, response.statusText);
+					btn.textContent = originalText; // Restore text on error
 				}
 			} catch (err) {
 				console.error('Error updating status:', err);
+				btn.textContent = originalText; // Restore text on error
+			} finally {
+				btn.disabled = false;
 			}
 		});
 	});

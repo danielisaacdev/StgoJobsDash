@@ -12,7 +12,10 @@ let jobs = [];
 try {
 	const response = await fetch(`${API_URL}/jobs?include_applied=true`);
 	if (response.ok) {
-		jobs = await response.json();
+		const data = await response.json();
+		jobs = Array.isArray(data) ? data : [];
+	} else {
+		console.error("Backend Error:", response.status, response.statusText);
 	}
 } catch (error) {
 	console.error("Backend Error:", error);
@@ -88,16 +91,16 @@ const remotePercent = totalJobs > 0
 			<div id="jobsContainer" class="jobs-grid">
 				{jobs.length > 0 ? jobs.map((job) => (
 					<JobCard 
-						id={job.id}
-						title={job.titulo}
-						company={job.empresa}
-						link={job.link}
-						date={job.fecha_publicacion}
-						modality={job.modalidad}
-						salary={job.sueldo_estimado}
-						score={job.matching_score}
-						applied={job.aplicado === 1}
-						description={job.descripcion}
+						id={job?.id || ''}
+						title={job?.titulo || 'Título no disponible'}
+						company={job?.empresa || 'Empresa no disponible'}
+						link={job?.link || '#'}
+						date={job?.fecha_publicacion || ''}
+						modality={job?.modalidad || ''}
+						salary={job?.sueldo_estimado || ''}
+						score={job?.matching_score || 0}
+						applied={job?.aplicado === 1}
+						description={job?.descripcion || ''}
 					/>
 				)) : (
 					<div class="no-jobs">
@@ -351,21 +354,31 @@ const remotePercent = totalJobs > 0
 	const scoreVal = document.getElementById('scoreVal');
 	const jobsContainer = document.getElementById('jobsContainer');
 
-	scoreRange.addEventListener('input', (e) => {
-		scoreVal.textContent = `${e.target.value}%`;
-		filterJobs();
-	});
+	if (scoreRange && scoreVal) {
+		scoreRange.addEventListener('input', (e) => {
+			scoreVal.textContent = `${e.target.value}%`;
+			filterJobs();
+		});
+	}
 
-	hideApplied.addEventListener('change', filterJobs);
+	if (hideApplied) {
+		hideApplied.addEventListener('change', filterJobs);
+	}
 
 	async function filterJobs() {
-		const hide = hideApplied.checked;
-		const minScore = parseInt(scoreRange.value);
-		
-		const response = await fetch(`${API_BASE}/jobs?include_applied=${!hide}&min_score=${minScore}`);
-		if (response.ok) {
-			const jobs = await response.json();
-			renderJobs(jobs);
+		try {
+			const hide = hideApplied?.checked || false;
+			const minScore = parseInt(scoreRange?.value || 0);
+			
+			const response = await fetch(`${API_BASE}/jobs?include_applied=${!hide}&min_score=${minScore}`);
+			if (response.ok) {
+				const jobs = await response.json();
+				renderJobs(jobs);
+			} else {
+				console.error('Filter failed:', response.status);
+			}
+		} catch (err) {
+			console.error('Error filtering jobs:', err);
 		}
 	}
 
@@ -378,37 +391,53 @@ const remotePercent = totalJobs > 0
 	}
 
 	scrapeBtn.addEventListener('click', async () => {
+		if (!scrapeBtn || !queryInput) return;
+		
 		scrapeBtn.disabled = true;
+		const originalText = scrapeBtn.textContent;
 		scrapeBtn.textContent = 'Buscando...';
-		const query = queryInput.value || 'Python';
+		const query = queryInput.value?.trim() || 'Python';
 		
 		try {
-			await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
-			location.reload();
+			const response = await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
+			if (response.ok) {
+				location.reload();
+			} else {
+				console.error('Scrape failed:', response.status);
+				scrapeBtn.textContent = originalText;
+			}
 		} catch (err) {
-			console.error(err);
+			console.error('Error scraping:', err);
+			scrapeBtn.textContent = originalText;
 		} finally {
 			scrapeBtn.disabled = false;
-			scrapeBtn.textContent = 'Scrapear';
 		}
 	});
 
 	matchingBtn.addEventListener('click', async () => {
+		if (!matchingBtn || !cvText) return;
+		
 		matchingBtn.disabled = true;
+		const originalText = matchingBtn.textContent;
 		matchingBtn.textContent = 'Procesando...';
 		
 		try {
-			await fetch(`${API_BASE}/matching`, {
+			const response = await fetch(`${API_BASE}/matching`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cv_text: cvText.value })
+				body: JSON.stringify({ cv_text: cvText.value || '' })
 			});
-			location.reload();
+			if (response.ok) {
+				location.reload();
+			} else {
+				console.error('Matching failed:', response.status);
+				matchingBtn.textContent = originalText;
+			}
 		} catch (err) {
-			console.error(err);
+			console.error('Error matching:', err);
+			matchingBtn.textContent = originalText;
 		} finally {
 			matchingBtn.disabled = false;
-			matchingBtn.textContent = 'Actualizar Scores';
 		}
 	});
 </script>
