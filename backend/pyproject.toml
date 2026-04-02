@@ -1,0 +1,11 @@
+[project]
+name = "stgojobsdash-backend"
+version = "0.1.0"
+description = "Backend for StgoJobsDash"
+
+[project.scripts]
+app = "main:app"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
