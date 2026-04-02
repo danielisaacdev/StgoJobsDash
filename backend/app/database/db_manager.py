@@ -4,7 +4,7 @@ from datetime import datetime
 
 class DBManager:
     def __init__(self, db_name="empleos.db"):
-        self.db_path = os.path.join(os.path.dirname(__file__), "..", "..", db_name)
+        self.db_path = f"/tmp/{db_name}"
         self._init_db()
 
     def _get_connection(self):
