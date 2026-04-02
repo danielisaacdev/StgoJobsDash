@@ -203,12 +203,13 @@ const displayModality = modality || 'No especificado';
 		? 'http://localhost:8000'
 		: '/api';
 
-	document.querySelectorAll('.apply-btn').forEach(btn => {
-		if (btn.hasAttribute('data-listener-attached')) return; // Avoid duplicate listeners
-		btn.setAttribute('data-listener-attached', 'true');
+	document.querySelectorAll('.apply-btn').forEach((btn: Element) => {
+		const button = btn as HTMLButtonElement;
+		if (button.hasAttribute('data-listener-attached')) return; // Avoid duplicate listeners
+		button.setAttribute('data-listener-attached', 'true');
 		
-		btn.addEventListener('click', async (e) => {
-			const card = btn.closest('.job-card');
+		button.addEventListener('click', async (e) => {
+			const card = button.closest('.job-card') as HTMLElement;
 			if (!card) return;
 			
 			const id = card.dataset.id;
@@ -217,12 +218,12 @@ const displayModality = modality || 'No especificado';
 				return;
 			}
 			
-			const isApplied = btn.dataset.applied === 'true';
+			const isApplied = button.dataset.applied === 'true';
 			
 			// Disable button during request
-			btn.disabled = true;
-			const originalText = btn.textContent;
-			btn.textContent = 'Actualizando...';
+			button.disabled = true;
+			const originalText = button.textContent;
+			button.textContent = 'Actualizando...';
 			
 			try {
 				const response = await fetch(`${API_BASE}/jobs/${id}/apply`, {
@@ -233,18 +234,18 @@ const displayModality = modality || 'No especificado';
 				
 				if (response.ok) {
 					const newState = !isApplied;
-					btn.dataset.applied = newState.toString();
-					btn.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
+					button.dataset.applied = newState.toString();
+					button.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
 					card.classList.toggle('applied', newState);
 				} else {
 					console.error('Failed to update status:', response.status, response.statusText);
-					btn.textContent = originalText; // Restore text on error
+					button.textContent = originalText; // Restore text on error
 				}
 			} catch (err) {
 				console.error('Error updating status:', err);
-				btn.textContent = originalText; // Restore text on error
+				button.textContent = originalText; // Restore text on error
 			} finally {
-				btn.disabled = false;
+				button.disabled = false;
 			}
 		});
 	});

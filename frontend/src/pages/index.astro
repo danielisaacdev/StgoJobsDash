@@ -1,31 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import JobCard from '../components/JobCard.astro';
 
-// SSR: Fetch initial jobs from FastAPI
-// En Vercel Multi-service, el backend se mapea a /api
-const API_URL = import.meta.env.PROD 
+// En Vercel (Prod), el backend está en /api
+// En Local, usar http://localhost:8000
+const API_BASE = import.meta.env.PROD 
 	? '/api' // URL relativa en producción
 	: 'http://localhost:8000';
 
-let jobs = [];
-try {
-	const response = await fetch(`${API_URL}/jobs?include_applied=true`);
-	if (response.ok) {
-		const data = await response.json();
-		jobs = Array.isArray(data) ? data : [];
-	} else {
-		console.error("Backend Error:", response.status, response.statusText);
-	}
-} catch (error) {
-	console.error("Backend Error:", error);
-}
-
-const totalJobs = jobs.length;
-const appliedCount = jobs.filter(j => j.aplicado).length;
-const remotePercent = totalJobs > 0 
-	? Math.round((jobs.filter(j => j.modalidad === 'Remoto').length / totalJobs) * 100) 
-	: 0;
+const jobs = [];
 ---
 
 <Layout title="StgoJobsDash | Dashboard Premium">
@@ -37,15 +19,15 @@ const remotePercent = totalJobs > 0
 		<div class="metrics-row">
 			<div class="metric">
 				<span class="label">Vacantes</span>
-				<span class="value">{totalJobs}</span>
+				<span class="value" id="totalJobs">0</span>
 			</div>
 			<div class="metric alt">
 				<span class="label">Postulados</span>
-				<span class="value">{appliedCount}</span>
+				<span class="value" id="appliedCount">0</span>
 			</div>
 			<div class="metric accent">
 				<span class="label">Remoto %</span>
-				<span class="value">{remotePercent}%</span>
+				<span class="value" id="remotePercent">0%</span>
 			</div>
 		</div>
 	</header>
@@ -86,27 +68,12 @@ const remotePercent = totalJobs > 0
 		<main class="jobs-list">
 			<div class="list-header">
 				<h2>Ofertas Recientes</h2>
-				<span id="resultsCount">{totalJobs} resultados</span>
+				<span id="resultsCount">0 resultados</span>
 			</div>
 			<div id="jobsContainer" class="jobs-grid">
-				{jobs.length > 0 ? jobs.map((job) => (
-					<JobCard 
-						id={job?.id || ''}
-						title={job?.titulo || 'Título no disponible'}
-						company={job?.empresa || 'Empresa no disponible'}
-						link={job?.link || '#'}
-						date={job?.fecha_publicacion || ''}
-						modality={job?.modalidad || ''}
-						salary={job?.sueldo_estimado || ''}
-						score={job?.matching_score || 0}
-						applied={job?.aplicado === 1}
-						description={job?.descripcion || ''}
-					/>
-				)) : (
-					<div class="no-jobs">
-						<p>No hay ofertas disponibles. Usa el scraper para buscar empleos.</p>
-					</div>
-				)}
+				<div class="no-jobs">
+					<p>No hay ofertas disponibles. Usa el scraper para buscar empleos.</p>
+				</div>
 			</div>
 		</main>
 	</div>
@@ -335,6 +302,138 @@ const remotePercent = totalJobs > 0
 		color: var(--text-secondary);
 		font-size: 1.1rem;
 	}
+
+	.job-card {
+		background: var(--card-bg);
+		border: 1px solid var(--border-color);
+		border-radius: 16px;
+		padding: 1.5rem;
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+		transition: var(--transition-smooth);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.job-card:hover {
+		transform: translateY(-4px);
+		border-color: var(--accent-secondary);
+		box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 
+		            0 0 15px -2px rgba(0, 112, 243, 0.2);
+	}
+
+	.applied {
+		opacity: 0.6;
+		filter: grayscale(0.5);
+	}
+
+	.header-main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.title {
+		font-size: 1.25rem;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.company {
+		color: var(--accent-primary);
+		font-weight: 600;
+		font-size: 0.9rem;
+		letter-spacing: 0.5px;
+		margin-bottom: 0.5rem;
+	}
+
+	.job-snippet {
+		font-size: 0.85rem;
+		color: var(--text-secondary);
+		line-height: 1.4;
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		overflow: hidden;
+		margin-bottom: 0.5rem;
+	}
+
+	.score-badge {
+		background: rgba(0, 0, 0, 0.3);
+		padding: 0.5rem 0.75rem;
+		border-radius: 8px;
+		border: 1px solid var(--score-color);
+		color: var(--score-color);
+		font-weight: 700;
+		font-size: 0.85rem;
+	}
+
+	.card-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+	}
+
+	.tag-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+
+	.tag {
+		background: var(--bg-secondary);
+		padding: 0.4rem 0.8rem;
+		border-radius: 8px;
+		font-size: 0.8rem;
+		color: var(--text-secondary);
+		border: 1px solid transparent;
+	}
+
+	.modality.remoto {
+		color: var(--accent-primary);
+		background: rgba(0, 242, 141, 0.1);
+		border-color: rgba(0, 242, 141, 0.2);
+	}
+
+	.card-footer {
+		display: flex;
+		gap: 0.75rem;
+		margin-top: auto;
+	}
+
+	.btn {
+		padding: 0.6rem 1.2rem;
+		border-radius: 10px;
+		font-weight: 600;
+		font-size: 0.9rem;
+		cursor: pointer;
+		transition: var(--transition-smooth);
+		text-decoration: none;
+		text-align: center;
+		flex: 1;
+		border: none;
+	}
+
+	.btn-primary {
+		background: linear-gradient(135deg, var(--accent-secondary), #0056b3);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		filter: brightness(1.1);
+		transform: scale(1.02);
+	}
+
+	.btn-secondary {
+		background: var(--bg-secondary);
+		color: var(--text-primary);
+		border: 1px solid var(--border-color);
+	}
+
+	.btn-secondary:hover {
+		border-color: var(--text-secondary);
+	}
 </style>
 
 <script>
@@ -345,34 +444,145 @@ const remotePercent = totalJobs > 0
 		? 'http://localhost:8000'
 		: '/api';
 
-	const scrapeBtn = document.getElementById('scrapeBtn');
-	const queryInput = document.getElementById('queryInput');
-	const matchingBtn = document.getElementById('matchingBtn');
-	const cvText = document.getElementById('cvText');
-	const hideApplied = document.getElementById('hideApplied');
-	const scoreRange = document.getElementById('scoreRange');
-	const scoreVal = document.getElementById('scoreVal');
-	const jobsContainer = document.getElementById('jobsContainer');
+	const scrapeBtn = document.getElementById('scrapeBtn') as HTMLButtonElement;
+	const queryInput = document.getElementById('queryInput') as HTMLInputElement;
+	const matchingBtn = document.getElementById('matchingBtn') as HTMLButtonElement;
+	const cvText = document.getElementById('cvText') as HTMLTextAreaElement;
+	const hideApplied = document.getElementById('hideApplied') as HTMLInputElement;
+	const scoreRange = document.getElementById('scoreRange') as HTMLInputElement;
+	const scoreVal = document.getElementById('scoreVal') as HTMLSpanElement;
+	const jobsContainer = document.getElementById('jobsContainer') as HTMLElement;
 
-	if (scoreRange && scoreVal) {
-		scoreRange.addEventListener('input', (e) => {
-			scoreVal.textContent = `${e.target.value}%`;
-			filterJobs();
+	async function loadJobs() {
+		try {
+			const response = await fetch(`${API_BASE}/jobs?include_applied=true`);
+			if (response.ok) {
+				const jobs = await response.json();
+				updateMetrics(jobs);
+				renderJobs(jobs);
+			} else {
+				console.error('Load failed:', response.status);
+			}
+		} catch (err) {
+			console.error('Error loading jobs:', err);
+		}
+	}
+
+	function updateMetrics(jobs: any[]) {
+		const totalJobs = jobs.length;
+		const appliedCount = jobs.filter((j: any) => j.aplicado).length;
+		const remotePercent = totalJobs > 0 
+			? Math.round((jobs.filter((j: any) => j.modalidad === 'Remoto').length / totalJobs) * 100) 
+			: 0;
+		
+		const totalJobsEl = document.getElementById('totalJobs');
+		const appliedCountEl = document.getElementById('appliedCount');
+		const remotePercentEl = document.getElementById('remotePercent');
+		const resultsCountEl = document.getElementById('resultsCount');
+		
+		if (totalJobsEl) totalJobsEl.textContent = totalJobs.toString();
+		if (appliedCountEl) appliedCountEl.textContent = appliedCount.toString();
+		if (remotePercentEl) remotePercentEl.textContent = `${remotePercent}%`;
+		if (resultsCountEl) resultsCountEl.textContent = `${totalJobs} resultados`;
+	}
+
+	function attachApplyListeners() {
+		document.querySelectorAll('.apply-btn').forEach((btn: Element) => {
+			const button = btn as HTMLButtonElement;
+			if (button.hasAttribute('data-listener-attached')) return;
+			button.setAttribute('data-listener-attached', 'true');
+			
+			button.addEventListener('click', async (e) => {
+				const card = button.closest('.job-card') as HTMLElement;
+				if (!card) return;
+				
+				const id = card.dataset.id;
+				if (!id) {
+					console.error('No job ID found');
+					return;
+				}
+				
+				const isApplied = button.dataset.applied === 'true';
+				
+				button.disabled = true;
+				const originalText = button.textContent;
+				button.textContent = 'Actualizando...';
+				
+				try {
+					const response = await fetch(`${API_BASE}/jobs/${id}/apply`, {
+						method: 'PATCH',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ aplicado: !isApplied })
+					});
+					
+					if (response.ok) {
+						const newState = !isApplied;
+						button.dataset.applied = newState.toString();
+						button.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
+						card.classList.toggle('applied', newState);
+					} else {
+						console.error('Failed to update status:', response.status, response.statusText);
+						button.textContent = originalText;
+					}
+				} catch (err) {
+					console.error('Error updating status:', err);
+					button.textContent = originalText;
+				} finally {
+					button.disabled = false;
+				}
+			});
 		});
 	}
 
-	if (hideApplied) {
-		hideApplied.addEventListener('change', filterJobs);
+	function generateJobHTML(job: any) {
+		const formattedDate = job.fecha_publicacion ? new Date(job.fecha_publicacion).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' }) : 'Fecha no disponible';
+		const scoreColor = (job.matching_score >= 80) ? 'var(--accent-primary)' : (job.matching_score >= 50) ? 'var(--accent-secondary)' : 'var(--text-secondary)';
+		const modalityClass = job.modalidad ? job.modalidad.toLowerCase() : '';
+		const displayModality = job.modalidad || 'No especificado';
+		
+		return `
+			<article class="job-card ${job.aplicado ? 'applied' : ''}" data-id="${job.id || ''}" data-link="${job.link || '#'}">
+				<div class="card-header">
+					<div class="header-main">
+						<h3 class="title">${job.titulo || 'Título no disponible'}</h3>
+						<p class="company">${job.empresa || 'Empresa no disponible'}</p>
+					</div>
+					${job.descripcion ? `<p class="job-snippet">${job.descripcion}</p>` : ''}
+					${job.matching_score > 0 ? `<div class="score-badge" style="--score-color: ${scoreColor}"><span>${Math.round(job.matching_score)}% Match</span></div>` : ''}
+				</div>
+				<div class="card-body">
+					<div class="tag-row">
+						<span class="tag">📅 ${formattedDate}</span>
+						<span class="tag modality ${modalityClass}">${displayModality}</span>
+						<span class="tag salary">${job.sueldo_estimado || 'No especificado'}</span>
+					</div>
+				</div>
+				<div class="card-footer">
+					<a href="${job.link || '#'}" target="_blank" class="btn btn-secondary">Ver Oferta</a>
+					<button class="btn btn-primary apply-btn" data-applied="${job.aplicado ? 'true' : 'false'}" data-id="${job.id || ''}">${job.aplicado ? 'Postulado ✓' : 'Marcar Postulado'}</button>
+				</div>
+			</article>
+		`;
+	}
+
+	function renderJobs(jobs: any[]) {
+		if (!jobsContainer) return;
+		
+		const html = jobs.length > 0 ? jobs.map(generateJobHTML).join('') : '<div class="no-jobs"><p>No hay ofertas disponibles. Usa el scraper para buscar empleos.</p></div>';
+		
+		jobsContainer.innerHTML = html;
+		attachApplyListeners();
 	}
 
 	async function filterJobs() {
 		try {
-			const hide = hideApplied?.checked || false;
-			const minScore = parseInt(scoreRange?.value || 0);
+			const hide = (hideApplied as HTMLInputElement)?.checked || false;
+			const minScore = parseInt((scoreRange as HTMLInputElement)?.value || '0');
 			
 			const response = await fetch(`${API_BASE}/jobs?include_applied=${!hide}&min_score=${minScore}`);
 			if (response.ok) {
 				const jobs = await response.json();
+				updateMetrics(jobs);
 				renderJobs(jobs);
 			} else {
 				console.error('Filter failed:', response.status);
@@ -382,12 +592,16 @@ const remotePercent = totalJobs > 0
 		}
 	}
 
-	function renderJobs(jobs) {
-		// Por simplicidad en este MVP, recargamos la página o inyectamos HTML
-		// Idealmente usaríamos React/Vue en el Island o un framework SPA
-		// Pero como es Astro Vanilla, podemos simplemente recargar si es local
-		// O manipular el DOM agresivamente:
-		location.reload(); // Hard refresh para simplificar sincronía con SSR en este paso
+	if (scoreRange && scoreVal) {
+		scoreRange.addEventListener('input', (e) => {
+			const target = e.target as HTMLInputElement;
+			scoreVal.textContent = `${target.value}%`;
+			filterJobs();
+		});
+	}
+
+	if (hideApplied) {
+		hideApplied.addEventListener('change', filterJobs);
 	}
 
 	scrapeBtn.addEventListener('click', async () => {
@@ -396,7 +610,7 @@ const remotePercent = totalJobs > 0
 		scrapeBtn.disabled = true;
 		const originalText = scrapeBtn.textContent;
 		scrapeBtn.textContent = 'Buscando...';
-		const query = queryInput.value?.trim() || 'Python';
+		const query = (queryInput as HTMLInputElement).value?.trim() || 'Python';
 		
 		try {
 			const response = await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
@@ -425,7 +639,7 @@ const remotePercent = totalJobs > 0
 			const response = await fetch(`${API_BASE}/matching`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ cv_text: cvText.value || '' })
+				body: JSON.stringify({ cv_text: (cvText as HTMLTextAreaElement).value || '' })
 			});
 			if (response.ok) {
 				location.reload();
@@ -440,4 +654,6 @@ const remotePercent = totalJobs > 0
 			matchingBtn.disabled = false;
 		}
 	});
+
+	document.addEventListener('DOMContentLoaded', loadJobs);
 </script>
