@@ -194,6 +194,9 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 		: '/api';
 
 	document.querySelectorAll('.apply-btn').forEach(btn => {
+		if (btn.hasAttribute('data-listener-attached')) return; // Avoid duplicate listeners
+		btn.setAttribute('data-listener-attached', 'true');
+		
 		btn.addEventListener('click', async (e) => {
 			const card = btn.closest('.job-card');
 			const id = card.dataset.id;
@@ -211,6 +214,8 @@ const scoreColor = score >= 80 ? 'var(--accent-primary)' : score >= 50 ? 'var(--
 					btn.dataset.applied = newState.toString();
 					btn.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
 					card.classList.toggle('applied', newState);
+				} else {
+					console.error('Failed to update status:', response.status);
 				}
 			} catch (err) {
 				console.error('Error updating status:', err);

@@ -86,7 +86,7 @@ const remotePercent = totalJobs > 0
 				<span id="resultsCount">{totalJobs} resultados</span>
 			</div>
 			<div id="jobsContainer" class="jobs-grid">
-				{jobs.map((job) => (
+				{jobs.length > 0 ? jobs.map((job) => (
 					<JobCard 
 						id={job.id}
 						title={job.titulo}
@@ -99,7 +99,11 @@ const remotePercent = totalJobs > 0
 						applied={job.aplicado === 1}
 						description={job.descripcion}
 					/>
-				))}
+				)) : (
+					<div class="no-jobs">
+						<p>No hay ofertas disponibles. Usa el scraper para buscar empleos.</p>
+					</div>
+				)}
 			</div>
 		</main>
 	</div>
@@ -319,6 +323,14 @@ const remotePercent = totalJobs > 0
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
 		gap: 1.5rem;
+	}
+
+	.no-jobs {
+		grid-column: 1 / -1;
+		text-align: center;
+		padding: 3rem;
+		color: var(--text-secondary);
+		font-size: 1.1rem;
 	}
 </style>
 
