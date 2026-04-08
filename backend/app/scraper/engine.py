@@ -4,24 +4,24 @@ import time
 import random
 from datetime import datetime, timedelta
 import re
-from fake_useragent import UserAgent
+import urllib.parse
+from functools import lru_cache
 
 class ChileScraper:
-    # URL base refinada. 2=busqueda, 13=1022(Santiago), categoria=2007(TI), f=2(fecha)
-    # Dejamos la categoría dinámica por si el usuario busca algo que no es TI
-    BASE_URL = "https://www.chiletrabajos.cl/encuentra-un-empleo?2={query}&13=1022&categoria=2007&f=2&pagina={page}"
+    # URL abierta sin restringir categoría ni región, para encontrar opciones en todo ChileTrabajos.
+    BASE_URL = "https://www.chiletrabajos.cl/encuentra-un-empleo?2={query}&f=2&pagina={page}"
     
     def __init__(self):
-        self.ua = UserAgent()
-        self.jobs = []
-
-    def _get_headers(self):
-        return {
-            "User-Agent": self.ua.random,
+        # Usamos un User-Agent estático para evitar la dependencia fake_useragent (Regla: Reducción de ruido)
+        self.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "es-CL,es;q=0.8,en-US;q=0.5,en;q=0.3",
             "Referer": "https://www.chiletrabajos.cl/"
         }
+
+    def _get_headers(self):
+        return self.headers
 
     def _normalize_date(self, date_str):
         now = datetime.now()
@@ -47,16 +47,27 @@ class ChileScraper:
         
         return now
 
-    def scrape(self, query, max_pages=3):
-        self.jobs = []
-        encoded_query = query.replace(" ", "+")
-        
+    @lru_cache(maxsize=32)
+    def scrape(self, query, max_pages=1):
+        """
+        Extrae empleos de Chiletrabajos. 
+        Implementa lru_cache (memoization) para contestar al instante si se repite la misma búsqueda.
+        """
+        jobs = []
         for page in range(1, max_pages + 1):
-            url = self.BASE_URL.format(query=encoded_query, page=page)
-            print(f"Buscando en: {url}")
+            if query.startswith('http'):
+                url_parts = urllib.parse.urlparse(query)
+                qs = urllib.parse.parse_qs(url_parts.query)
+                qs['pagina'] = [str(page)]
+                new_query = urllib.parse.urlencode(qs, doseq=True)
+                target_url = urllib.parse.urlunparse((url_parts.scheme, url_parts.netloc, url_parts.path, url_parts.params, new_query, url_parts.fragment))
+            else:
+                encoded_query = urllib.parse.quote_plus(query)
+                target_url = self.BASE_URL.format(query=encoded_query, page=page)
+            print(f"Buscando en: {target_url}")
             
             try:
-                response = requests.get(url, headers=self._get_headers(), timeout=15)
+                response = requests.get(target_url, headers=self._get_headers(), timeout=15)
                 if response.status_code != 200: break
                 
                 soup = BeautifulSoup(response.text, 'html.parser')
@@ -108,7 +119,7 @@ class ChileScraper:
                     salary_match = re.search(r'\$\s?[\d\.]+', container.text)
                     salary = salary_match.group(0) if salary_match else "No especificado"
 
-                    self.jobs.append({
+                    jobs.append({
                         "id": re.search(r'-(\d+)$', link).group(1) if re.search(r'-(\d+)$', link) else link.split('/')[-1],
                         "titulo": title,
                         "descripcion": description, # Nueva columna para mejorar IA
@@ -127,7 +138,7 @@ class ChileScraper:
                 print(f"Falla en scraper: {e}")
                 break
                 
-        return self.jobs
+        return jobs
 
 if __name__ == "__main__":
     scraper = ChileScraper()

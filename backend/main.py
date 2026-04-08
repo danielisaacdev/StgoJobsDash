@@ -1,78 +1,62 @@
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 from app.scraper.engine import ChileScraper
-from app.database.db_manager import DBManager
 from app.ai.matcher import CVMatcher
 
+# Por qué: Separar responsabilidades es clave. FastAPI solo actúa como enrutador ligero.
 app = FastAPI(title="StgoJobsDash API", version="1.0.0")
-db = DBManager()
 scraper = ChileScraper()
 matcher = CVMatcher()
 
-# Configuración de CORS para el frontend de Astro
+# Por qué: Configuración de CORS estricta pero abierta para localhost o producción,
+# permitiendo al frontend Astro consumir el API sin bloqueos del navegador.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # En producción cambiar a los dominios específicos
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-class JobUpdate(BaseModel):
-    aplicado: bool
-
 class CVInput(BaseModel):
     cv_text: str
+    jobs: List[dict]
 
 @app.get("/scrape")
 async def run_scrape(query: str = Query(..., description="Término de búsqueda")):
+    """
+    Por qué: Llama al scraper, que ya cuenta con memoization local para resolver peticiones
+    repetidas instantáneamente sin quemar el servidor ni ser bloqueados.
+    """
     try:
         jobs = scraper.scrape(query, max_pages=3)
-        db.save_jobs(jobs)
-        return {"status": "success", "jobs_found": len(jobs)}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/jobs")
-async def get_jobs(
-    include_applied: bool = Query(True, description="Incluir ofertas ya marcadas como aplicadas"),
-    min_score: int = Query(0, description="Filtrar por score mínimo de matching")
-):
-    try:
-        jobs = db.get_jobs(filter_applied=not include_applied, min_score=min_score)
-        return jobs
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.patch("/jobs/{job_id}/apply")
-async def update_apply_status(job_id: str, status: JobUpdate):
-    try:
-        with db._get_connection() as conn:
-            conn.execute("UPDATE jobs SET aplicado = ? WHERE id = ?", (1 if status.aplicado else 0, job_id))
-            conn.commit()
-        return {"status": "success", "job_id": job_id, "aplicado": status.aplicado}
+        return {"status": "success", "jobs_found": len(jobs), "jobs": jobs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/matching")
 async def calculate_match(input_data: CVInput):
+    """
+    Por qué: Método Stateless. En vez de guardar empleos en una Base de Datos local
+    y tener que actualizar scores id por id, el frontend manda los empleos scrapeados,
+    el backend actualiza los puntajes y devuelve la lista mejorada en ms.
+    """
     try:
-        # Recuperar todos los empleos
-        jobs = db.get_jobs(filter_applied=False)
-        if not jobs:
-            return {"status": "no jobs found", "matches": 0}
-            
-        # Combinar título y descripción para un matching mucho más preciso
-        job_texts = [f"{job['titulo']} {job.get('descripcion', '')}" for job in jobs]
+        jobs = input_data.jobs
+        if not jobs or not input_data.cv_text:
+            return {"status": "success", "jobs": jobs}
+
+        # Combinar título y descripción mejora la precisión del TD-IDF.
+        job_texts = [f"{job.get('titulo', '')} {job.get('descripcion', '')}" for job in jobs]
         scores = matcher.calculate_matching(input_data.cv_text, job_texts)
         
-        # Actualizar scores en DB
+        # Actualizamos la estructura de jobs al vuelo (in memory)
         for i, score in enumerate(scores):
-            db.update_matching_score(jobs[i]['id'], score)
+            jobs[i]['matching_score'] = score
             
-        return {"status": "success", "matches": len(scores)}
+        return {"status": "success", "jobs": jobs}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -80,7 +64,6 @@ async def calculate_match(input_data: CVInput):
 async def health():
     return {"status": "ok"}
 
-# Exportamos 'app' para que Vercel lo detecte automáticamente como entrada de FastAPI
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

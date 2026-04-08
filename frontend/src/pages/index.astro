@@ -1,11 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-// En Vercel (Prod), el backend está en /api
-// En Local, usar http://localhost:8000
-const API_BASE = import.meta.env.PROD 
-	? '/api' // URL relativa en producción
-	: 'http://localhost:8000';
+// Por qué: Mantenemos el código simple y predecible apuntando a localhost, eliminando la dependencia compleja de Vercel.
+const API_BASE = 'http://localhost:8000';
 
 const jobs = [];
 ---
@@ -62,6 +59,11 @@ const jobs = [];
 				<h3>CV para Matching</h3>
 				<textarea id="cvText" placeholder="Pega tu CV (texto) aquí para calcular el match score..."></textarea>
 				<button id="matchingBtn" class="btn btn-secondary">Actualizar Scores</button>
+			</div>
+
+			<div class="sidebar-section">
+				<h3>Exportar Datos</h3>
+				<button id="exportCsvBtn" class="btn btn-primary" style="width: 100%;">Exportar a CSV</button>
 			</div>
 		</aside>
 
@@ -438,15 +440,13 @@ const jobs = [];
 
 <script>
 	// Interactivity and dynamic fetching
-	// En Vercel (Prod), el backend está en /api
-	// En Local, usar http://localhost:8000
-	const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-		? 'http://localhost:8000'
-		: '/api';
+	// Por qué: Cliente siempre apunta al backend local de FastAPI.
+	const API_BASE = 'http://localhost:8000';
 
 	const scrapeBtn = document.getElementById('scrapeBtn') as HTMLButtonElement;
 	const queryInput = document.getElementById('queryInput') as HTMLInputElement;
 	const matchingBtn = document.getElementById('matchingBtn') as HTMLButtonElement;
+	const exportCsvBtn = document.getElementById('exportCsvBtn') as HTMLButtonElement;
 	const cvText = document.getElementById('cvText') as HTMLTextAreaElement;
 	const hideApplied = document.getElementById('hideApplied') as HTMLInputElement;
 	const scoreRange = document.getElementById('scoreRange') as HTMLInputElement;
@@ -454,9 +454,7 @@ const jobs = [];
 	const jobsContainer = document.getElementById('jobsContainer') as HTMLElement;
 
 	async function loadJobs() {
-		const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
-		updateMetrics(jobs);
-		renderJobs(jobs);
+		filterJobs();
 	}
 
 	function updateMetrics(jobs: any[]) {
@@ -500,27 +498,16 @@ const jobs = [];
 				button.textContent = 'Actualizando...';
 				
 				try {
-					const response = await fetch(`${API_BASE}/jobs/${id}/apply`, {
-						method: 'PATCH',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ aplicado: !isApplied })
-					});
+					const newState = !isApplied;
+					button.dataset.applied = newState.toString();
+					button.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
+					card.classList.toggle('applied', newState);
 					
-					if (response.ok) {
-						const newState = !isApplied;
-						button.dataset.applied = newState.toString();
-						button.textContent = newState ? 'Postulado ✓' : 'Marcar Postulado';
-						card.classList.toggle('applied', newState);
-						
-						// Update localStorage
-						const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
-						const job = jobs.find((j: any) => j.id === id);
-						if (job) job.aplicado = newState;
-						localStorage.setItem('jobs', JSON.stringify(jobs));
-					} else {
-						console.error('Failed to update status:', response.status, response.statusText);
-						button.textContent = originalText;
-					}
+					// Update localStorage
+					const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+					const job = jobs.find((j: any) => j.id === id);
+					if (job) job.aplicado = newState;
+					localStorage.setItem('jobs', JSON.stringify(jobs));
 				} catch (err) {
 					console.error('Error updating status:', err);
 					button.textContent = originalText;
@@ -575,7 +562,23 @@ const jobs = [];
 		const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
 		const hide = (hideApplied as HTMLInputElement)?.checked || false;
 		const minScore = parseInt((scoreRange as HTMLInputElement)?.value || '0');
-		const filtered = jobs.filter((j: any) => (hide ? !j.aplicado : true) && j.matching_score >= minScore);
+		
+		const filtered = jobs.filter((j: any) => (hide ? !j.aplicado : true) && (j.matching_score || 0) >= minScore);
+		
+		// Por qué: Ordenamiento múltiple. Score de mayor e menor, seguido de la fecha de publicación original.
+		filtered.sort((a: any, b: any) => {
+			const scoreA = a.matching_score || 0;
+			const scoreB = b.matching_score || 0;
+			
+			if (scoreB !== scoreA) {
+				return scoreB - scoreA;
+			}
+			
+			const dateA = a.fecha_publicacion ? new Date(a.fecha_publicacion).getTime() : 0;
+			const dateB = b.fecha_publicacion ? new Date(b.fecha_publicacion).getTime() : 0;
+			return dateB - dateA;
+		});
+
 		updateMetrics(filtered);
 		renderJobs(filtered);
 	}
@@ -598,24 +601,22 @@ const jobs = [];
 		scrapeBtn.disabled = true;
 		const originalText = scrapeBtn.textContent;
 		scrapeBtn.textContent = 'Buscando...';
-		const query = (queryInput as HTMLInputElement).value?.trim() || 'Python';
+		let query = (queryInput as HTMLInputElement).value?.trim() || 'Python';
 		
 		try {
 			const response = await fetch(`${API_BASE}/scrape?query=${encodeURIComponent(query)}`);
 			if (response.ok) {
 				const data = await response.json();
 				localStorage.setItem('jobs', JSON.stringify(data.jobs));
-				updateMetrics(data.jobs);
-				renderJobs(data.jobs);
+				filterJobs();
 			} else {
 				console.error('Scrape failed:', response.status);
-				scrapeBtn.textContent = originalText;
 			}
 		} catch (err) {
 			console.error('Error scraping:', err);
-			scrapeBtn.textContent = originalText;
 		} finally {
 			scrapeBtn.disabled = false;
+			scrapeBtn.textContent = originalText;
 		}
 	});
 
@@ -636,19 +637,48 @@ const jobs = [];
 			if (response.ok) {
 				const data = await response.json();
 				localStorage.setItem('jobs', JSON.stringify(data.jobs));
-				updateMetrics(data.jobs);
-				renderJobs(data.jobs);
+				filterJobs();
 			} else {
 				console.error('Matching failed:', response.status);
 				matchingBtn.textContent = originalText;
 			}
 		} catch (err) {
 			console.error('Error matching:', err);
-			matchingBtn.textContent = originalText;
 		} finally {
 			matchingBtn.disabled = false;
+			matchingBtn.textContent = originalText;
 		}
 	});
+
+	if (exportCsvBtn) {
+		exportCsvBtn.addEventListener('click', () => {
+			// Por qué: El front ya posee los datos en memoria. Es instantáneo exportar desde aquí sin carga de servidor.
+			const jobs = JSON.parse(localStorage.getItem('jobs') || '[]');
+			if (jobs.length === 0) return alert('No hay datos para exportar.');
+			
+			const headers = ['ID', 'Título', 'Empresa', 'Modalidad', 'Sueldo', 'Score', 'Link', 'Postulado'];
+			const rows = jobs.map((j: any) => [
+				j.id,
+				`"${j.titulo?.replace(/"/g, '""') || ''}"`,
+				`"${j.empresa?.replace(/"/g, '""') || ''}"`,
+				j.modalidad || '',
+				`"${j.sueldo_estimado?.replace(/"/g, '""') || ''}"`,
+				j.matching_score || 0,
+				j.link || '',
+				j.aplicado ? 'Sí' : 'No'
+			]);
+			
+			const csvContent = [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+			const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.setAttribute('download', 'ofertas_chiletrabajos.csv');
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		});
+	}
 
 	document.addEventListener('DOMContentLoaded', loadJobs);
 </script>
